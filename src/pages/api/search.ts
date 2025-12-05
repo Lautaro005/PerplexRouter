@@ -14,7 +14,18 @@ const headers = {
   'Cache-Control': 's-maxage=60'
 };
 
-const ENDPOINTS = ['https://duckduckgo.com/html/', 'https://html.duckduckgo.com/html/'];
+type UpstreamTarget = {
+  url: string;
+  method: 'GET' | 'POST';
+};
+
+const UPSTREAMS: UpstreamTarget[] = [
+  { url: 'https://duckduckgo.com/html/', method: 'POST' },
+  { url: 'https://html.duckduckgo.com/html/', method: 'POST' },
+  { url: 'https://duckduckgo.com/html/', method: 'GET' },
+  { url: 'https://html.duckduckgo.com/html/', method: 'GET' },
+  { url: 'https://lite.duckduckgo.com/lite/', method: 'GET' }
+];
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 type SearchResult = {
@@ -47,58 +58,118 @@ const normalizeLink = (rawLink: string) => {
   }
 };
 
-const looksBlocked = (html: string) =>
-  /captcha/i.test(html) || /unusual traffic/i.test(html) || /detected unusual/i.test(html);
+const looksBlocked = (html: string, status: number) => {
+  if (status === 403 || status === 429) return true;
+  const lower = html.toLowerCase();
+  return (
+    lower.includes('captcha') ||
+    lower.includes('unusual traffic') ||
+    lower.includes('detected unusual') ||
+    lower.includes('access denied') ||
+    lower.includes('forbidden') ||
+    lower.includes('rate limit') ||
+    lower.includes('unusual activity') ||
+    lower.includes('verify you are human') ||
+    lower.includes('blocked request')
+  );
+};
 
 const parseResults = (html: string): SearchResult[] => {
   const $ = load(html);
+  const seen = new Set<string>();
+  const results: SearchResult[] = [];
 
-  return $('.result')
-    .map((_, el) => {
-      const title = $(el).find('.result__a').text().trim();
-      const link = normalizeLink($(el).find('.result__a').attr('href') || '');
+  const pushResult = (title: string, link: string, snippet: string) => {
+    const normalizedLink = normalizeLink(link);
+    if (!title || !normalizedLink || seen.has(normalizedLink)) return;
+    seen.add(normalizedLink);
+    results.push({ title, link: normalizedLink, snippet });
+  };
+
+  $('.result').each((_, el) => {
+    const title = $(el).find('.result__a, a.result__a').text().trim();
+    const link = $(el).find('.result__a, a.result__a').attr('href') || '';
+    const snippet =
+      $(el)
+        .find('.result__snippet, .result__desc, .result__url')
+        .text()
+        .trim() || '';
+
+    pushResult(title, link, snippet);
+  });
+
+  if (!results.length) {
+    $('a.result__a, a.result__url, a.result-link').each((_, el) => {
+      const link = $(el).attr('href') || '';
+      const title = $(el).text().trim();
       const snippet =
-        $(el).find('.result__snippet').text().trim() || $(el).find('.result__url').text().trim() || '';
+        $(el)
+          .closest('.result, .result-link, .web-result')
+          .find('.result__snippet, .result__desc')
+          .text()
+          .trim() || '';
 
-      return { title, link, snippet };
-    })
-    .get()
-    .filter((item) => item.title && item.link)
-    .slice(0, 10);
+      pushResult(title, link, snippet);
+    });
+  }
+
+  if (!results.length) {
+    $('a[href^="/l/?"], a[href*="uddg="]').each((_, el) => {
+      const link = $(el).attr('href') || '';
+      const title = $(el).text().trim();
+      if (title.length < 3) return;
+      pushResult(title, link, '');
+    });
+  }
+
+  return results.slice(0, 10);
 };
 
 const searchUpstream = async (query: string) => {
   const userAgent = pickUserAgent();
 
-  for (const endpoint of ENDPOINTS) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': userAgent,
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.9,en-US;q=0.8,en;q=0.7',
-        Referer: 'https://duckduckgo.com/',
-        Origin: 'https://duckduckgo.com',
-        'Cache-Control': 'no-cache'
-      },
-      body: new URLSearchParams({ q: query })
+  for (const { url, method } of UPSTREAMS) {
+    const params = new URLSearchParams({ q: query });
+    const targetUrl = method === 'GET' ? `${url}?${params.toString()}` : url;
+    const baseHeaders = {
+      'User-Agent': userAgent,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'es-ES,es;q=0.9,en-US;q=0.8,en;q=0.7',
+      Referer: 'https://duckduckgo.com/',
+      Origin: 'https://duckduckgo.com',
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+      DNT: '1',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-User': '?1',
+      'Sec-Fetch-Dest': 'document'
+    };
+
+    const response = await fetch(targetUrl, {
+      method,
+      headers:
+        method === 'POST'
+          ? { ...baseHeaders, 'Content-Type': 'application/x-www-form-urlencoded' }
+          : baseHeaders,
+      body: method === 'POST' ? params : undefined
     });
 
-    if (!response.ok) {
+    const html = await response.text();
+    const blocked = looksBlocked(html, response.status);
+
+    if (!response.ok && !blocked) {
       continue;
     }
 
-    const html = await response.text();
+    if (blocked) {
+      return { results: [], blocked: true };
+    }
+
     const parsed = parseResults(html);
 
     if (parsed.length) {
       return { results: parsed, blocked: false };
-    }
-
-    if (looksBlocked(html)) {
-      return { results: [], blocked: true };
     }
   }
 
