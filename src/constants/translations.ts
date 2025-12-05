@@ -1,0 +1,97 @@
+import type { Language } from '../types/chat';
+
+export const TRANSLATIONS = {
+  es: {
+    whereKnowledgeBegins: 'Donde comienza el conocimiento',
+    askAnything: 'Pregunta lo que sea...',
+    availableModels: 'MODELOS DISPONIBLES',
+    newThread: 'Nuevo Hilo',
+    home: 'Inicio',
+    library: 'Biblioteca',
+    recents: 'RECIENTES',
+    settings: 'Configuración',
+    noHistory: 'No hay historial reciente',
+    libraryTitle: 'Biblioteca de Hilos',
+    libraryEmpty: 'Tu biblioteca está vacía.',
+    startNewThread: 'Comenzar un nuevo hilo',
+    backToHome: 'Volver al inicio',
+    generating: 'GENERANDO RESPUESTA...',
+    thinking: 'PENSANDO...',
+    sources: 'Fuentes',
+    webSearch: 'Búsqueda web',
+    webSearchOn: 'Web activada',
+    webSearchOff: 'Web desactivada',
+    webSearchError: 'No se pudieron cargar las fuentes web.',
+    followUp: 'Haz una pregunta de seguimiento...',
+    settingsTitle: 'Configuración',
+    general: 'General',
+    models: 'Modelos IA',
+    appearance: 'Aspecto',
+    apiKeyTitle: 'OpenRouter API Key',
+    apiKeyDesc: 'Esta llave se guarda localmente. Necesaria para conectar.',
+    modelManagement: 'Gestión de Modelos',
+    modelManagementDesc: 'Agrega, elimina o reordena los modelos.',
+    modelId: 'ID del Modelo',
+    modelName: 'Nombre',
+    themeTitle: 'Tema de la Interfaz',
+    darkMode: 'Modo Oscuro',
+    lightMode: 'Modo Claro',
+    languageTitle: 'Idioma',
+    defaultLang: 'Idioma predeterminado',
+    interfaceLang: 'Idioma de la interfaz',
+    errorNoKey:
+      'Error: No se detectó API Key. Ve a configuración y añade tu OpenRouter Key.',
+    errorApi: 'Error al conectar con OpenRouter.',
+    completed: 'Completado'
+  },
+  en: {
+    whereKnowledgeBegins: 'Where knowledge begins',
+    askAnything: 'Ask anything...',
+    availableModels: 'AVAILABLE MODELS',
+    newThread: 'New Thread',
+    home: 'Home',
+    library: 'Library',
+    recents: 'RECENTS',
+    settings: 'Settings',
+    noHistory: 'No recent history',
+    libraryTitle: 'Thread Library',
+    libraryEmpty: 'Your library is empty.',
+    startNewThread: 'Start a new thread',
+    backToHome: 'Back to home',
+    generating: 'GENERATING RESPONSE...',
+    thinking: 'THINKING...',
+    sources: 'Sources',
+    webSearch: 'Web search',
+    webSearchOn: 'Web on',
+    webSearchOff: 'Web off',
+    webSearchError: 'Unable to load web sources.',
+    followUp: 'Ask a follow-up...',
+    settingsTitle: 'Settings',
+    general: 'General',
+    models: 'AI Models',
+    appearance: 'Appearance',
+    apiKeyTitle: 'OpenRouter API Key',
+    apiKeyDesc: 'Key is stored locally. Required to connect.',
+    modelManagement: 'Model Management',
+    modelManagementDesc: 'Add, remove or reorder models.',
+    modelId: 'Model ID',
+    modelName: 'Name',
+    themeTitle: 'Interface Theme',
+    darkMode: 'Dark Mode',
+    lightMode: 'Light Mode',
+    languageTitle: 'Language',
+    defaultLang: 'Default language',
+    interfaceLang: 'Interface language',
+    errorNoKey: 'Error: No API Key detected. Please go to settings and add your OpenRouter Key.',
+    errorApi: 'Error connecting to OpenRouter.',
+    completed: 'Completed'
+  }
+} as const;
+
+export type TranslationKey = keyof typeof TRANSLATIONS.en;
+
+export type Translator = (key: TranslationKey) => string;
+
+export const createTranslator = (language: Language): Translator => {
+  return (key) => TRANSLATIONS[language][key] || key;
+};
