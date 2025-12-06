@@ -163,6 +163,8 @@ const ChatSection = ({
     adjustFollowUpHeight();
   }, [followUpText]);
 
+  const contentWidth = 'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8';
+
   const copyContent = async (content: string, idx: number) => {
     if (typeof navigator === 'undefined' || !navigator.clipboard) return;
     try {
@@ -175,7 +177,7 @@ const ChatSection = ({
   };
 
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto px-4 w-full animate-fade-in relative">
+    <div className={`flex flex-col h-full w-full ${contentWidth} animate-fade-in relative`}>
       <div
         className={`sticky top-0 z-10 py-4 backdrop-blur-md flex justify-start items-center ${
           theme === 'dark' ? 'bg-[#191919]/80' : 'bg-[#f0f0f0]/80'
@@ -189,7 +191,10 @@ const ChatSection = ({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-56 md:pb-64 space-y-8" ref={chatContainerRef}>
+      <div
+        className="flex-1 overflow-y-auto pb-56 md:pb-64 space-y-8 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
+        ref={chatContainerRef}
+      >
         {messages.map((msg, idx) => {
           const isLastAssistant = idx === messages.length - 1;
 
@@ -199,7 +204,7 @@ const ChatSection = ({
                 <Zap size={16} /> {t('sources')}
               </div>
               <div
-                className={`flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory ${
+                className={`flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-thin scrollbar-track-transparent ${
                   theme === 'dark' ? 'scrollbar-thumb-gray-700' : 'scrollbar-thumb-gray-300'
                 }`}
               >
@@ -235,7 +240,7 @@ const ChatSection = ({
             >
               <div className="flex items-center gap-3 mb-3">
                 {msg.role === 'user' ? (
-                  <div className={`text-2xl font-serif ${textColor}`}>{msg.content}</div>
+                  <div className={`text-2xl font-serif leading-tight break-words ${textColor}`}>{msg.content}</div>
                 ) : msg.role === 'error' ? (
                   <div className="flex items-center gap-2 text-red-500 font-bold">
                     <AlertTriangle size={18} /> Error
@@ -249,7 +254,7 @@ const ChatSection = ({
 
               {msg.role !== 'user' && (
                 <div
-                  className={`prose max-w-none ${
+                  className={`prose max-w-none break-words ${
                     theme === 'dark'
                       ? 'prose-invert prose-p:text-gray-300 prose-li:text-gray-300'
                       : 'prose-gray text-gray-800'
@@ -338,7 +343,7 @@ const ChatSection = ({
             : 'bg-gradient-to-t from-[#f0f0f0] via-[#f0f0f0] to-transparent'
         }`}
       >
-        <div className="max-w-3xl mx-auto">
+        <div className={contentWidth}>
           <form
             onSubmit={handleSubmitFollowUp}
             className={`flex flex-col gap-3 p-3 rounded-2xl border ${inputBg}`}

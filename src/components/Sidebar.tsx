@@ -116,7 +116,7 @@ const Sidebar = ({
           </div>
         </button>
 
-        <nav className="space-y-1 mb-6">
+        <nav className="space-y-1 mb-3">
           <NavItem
             icon={<Search size={18} />}
             label={t('home')}
@@ -133,24 +133,32 @@ const Sidebar = ({
           />
         </nav>
 
-        <div className="flex-1 overflow-y-auto pr-2">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-2">
-            {t('recents')}
-          </h3>
-          <div className="space-y-1">
-            {recentHistory.length === 0 && (
-              <div className="px-3 text-sm text-gray-500 italic">{t('noHistory')}</div>
-            )}
-            {recentHistory.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onLoadChat(item)}
-                className={`w-full text-left px-3 py-2 text-sm rounded-lg truncate transition-colors
-                  ${theme === 'dark' ? 'text-gray-400 hover:text-[#e8e8e6] hover:bg-white/5' : 'text-gray-600 hover:text-black hover:bg-black/5'}`}
+        <div className="flex-1 overflow-hidden">
+          <div className="px-2">
+            {recentHistory.length === 0 ? (
+              <div className="px-1 text-sm text-gray-500 italic">{t('noHistory')}</div>
+            ) : (
+              <div
+                className={`space-y-1 pl-3 border-l ${
+                  theme === 'dark' ? 'border-white/10' : 'border-gray-200'
+                }`}
               >
-                {item.title}
-              </button>
-            ))}
+                {recentHistory.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onLoadChat(item)}
+                    className={`w-full text-left text-sm truncate transition-colors px-1 py-1 rounded ${
+                      theme === 'dark'
+                        ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                        : 'text-gray-600 hover:text-black hover:bg-black/5'
+                    }`}
+                    title={item.title}
+                  >
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
