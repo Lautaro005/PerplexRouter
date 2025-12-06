@@ -12,11 +12,14 @@ export const callOpenRouter = async (
   messages: Message[],
   modelId: string,
   apiKey: string,
+  systemPrompt?: string,
   searchResults?: SearchResult[]
 ): Promise<string> => {
   if (!apiKey) {
     throw new Error('NO_API_KEY');
   }
+
+  const trimmedSystemPrompt = systemPrompt?.trim();
 
   const sanitizedMessages = messages
     .filter((m): m is Message & { role: 'user' | 'assistant' } => isChatRole(m.role))
@@ -49,7 +52,11 @@ export const callOpenRouter = async (
     },
     body: JSON.stringify({
       model: modelId,
-      messages: [...sanitizedMessages, ...searchContext]
+      messages: [
+        ...(trimmedSystemPrompt ? [{ role: 'system', content: trimmedSystemPrompt }] : []),
+        ...sanitizedMessages,
+        ...searchContext
+      ]
     })
   });
 

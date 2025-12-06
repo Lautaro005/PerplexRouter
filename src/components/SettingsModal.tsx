@@ -9,6 +9,8 @@ interface SettingsModalProps {
   close: () => void;
   apiKey: string;
   setApiKey: (value: string) => void;
+  systemPrompt: string;
+  setSystemPrompt: (value: string) => void;
   models: ModelOption[];
   addModel: (model: ModelOption) => void;
   deleteModel: (id: string) => void;
@@ -32,6 +34,8 @@ const SettingsModal = ({
   setTheme,
   language,
   setLanguage,
+  systemPrompt,
+  setSystemPrompt,
   t
 }: SettingsModalProps) => {
   const [activeTab, setActiveTab] = useState<TabId>('general');
@@ -103,6 +107,17 @@ const SettingsModal = ({
                       className={`w-full rounded-lg py-2.5 pl-10 pr-4 focus:outline-none focus:border-[#2dd4bf] transition-colors font-mono text-sm ${inputBg}`}
                     />
                   </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-1">{t('systemPromptTitle')}</h3>
+                  <p className="text-sm text-gray-500 mb-4">{t('systemPromptDesc')}</p>
+                  <textarea
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    placeholder={t('systemPromptPlaceholder')}
+                    className={`w-full rounded-lg p-3 text-sm focus:outline-none focus:border-[#2dd4bf] transition-colors min-h-[120px] leading-6 ${inputBg}`}
+                  />
                 </div>
               </div>
             )}

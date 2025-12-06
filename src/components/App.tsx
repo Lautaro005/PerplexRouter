@@ -17,7 +17,7 @@ import type {
   Theme,
   ViewState
 } from '../types/chat';
-import { Menu } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -31,10 +31,12 @@ const App = () => {
   const [viewState, setViewState] = useState<ViewState>('home');
 
   const [apiKey, setApiKey] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [history, setHistory] = useState<ChatHistoryItem[]>([]);
   const [customModels, setCustomModels] = useState<ModelOption[]>(DEFAULT_MODELS);
   const [selectedModel, setSelectedModel] = useState<ModelOption>(DEFAULT_MODELS[0]);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [showWebSearchInfo, setShowWebSearchInfo] = useState(false);
 
   const [theme, setTheme] = useState<Theme>('dark');
   const [language, setLanguage] = useState<Language>('es');
@@ -47,8 +49,10 @@ const App = () => {
     const storedHistory = localStorage.getItem('chat_history');
     const storedModels = localStorage.getItem('custom_models');
     const storedWebSearch = localStorage.getItem('web_search_enabled');
+    const storedSystemPrompt = localStorage.getItem('system_prompt');
 
     if (storedKey) setApiKey(storedKey);
+    if (storedSystemPrompt) setSystemPrompt(storedSystemPrompt);
     if (storedHistory) {
       try {
         setHistory(JSON.parse(storedHistory));
@@ -77,6 +81,11 @@ const App = () => {
     if (!isBrowser) return;
     localStorage.setItem('openrouter_key', apiKey);
   }, [apiKey]);
+
+  useEffect(() => {
+    if (!isBrowser) return;
+    localStorage.setItem('system_prompt', systemPrompt);
+  }, [systemPrompt]);
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -163,7 +172,7 @@ const App = () => {
     }
 
     try {
-      const reply = await callOpenRouter(visibleMessages, currentModel.id, apiKey, searchResults);
+      const reply = await callOpenRouter(visibleMessages, currentModel.id, apiKey, systemPrompt, searchResults);
       const assistantMsg: Message = { role: 'assistant', content: reply };
       const updatedMessages = [...visibleMessages, assistantMsg];
 
@@ -221,7 +230,7 @@ const App = () => {
     }
 
     try {
-      const reply = await callOpenRouter(visibleMessages, currentModel.id, apiKey, searchResults);
+      const reply = await callOpenRouter(visibleMessages, currentModel.id, apiKey, systemPrompt, searchResults);
       const finalMessages = [...visibleMessages, { role: 'assistant', content: reply } as Message];
 
       setCurrentMessages(finalMessages);
@@ -268,6 +277,17 @@ const App = () => {
     }
   };
 
+  const handleDeleteAllHistory = () => {
+    setHistory([]);
+    setActiveChatId(null);
+    setCurrentMessages([]);
+    setViewState('library');
+  };
+
+  const handleStartNewFromLibrary = () => {
+    goToHome();
+  };
+
   const handleAddModel = (newModel: ModelOption) => {
     setCustomModels((prev) => {
       if (prev.some((model) => model.id === newModel.id)) return prev;
@@ -297,6 +317,14 @@ const App = () => {
     setActiveChatId(null);
   };
 
+  const handleToggleWebSearch = () => {
+    setWebSearchEnabled((prev) => {
+      const next = !prev;
+      if (next) setShowWebSearchInfo(true);
+      return next;
+    });
+  };
+
   const renderContent = () => {
     switch (viewState) {
       case 'home':
@@ -307,7 +335,7 @@ const App = () => {
             selectedModel={currentModel}
             setSelectedModel={setSelectedModel}
             webSearchEnabled={webSearchEnabled}
-            onToggleWebSearch={() => setWebSearchEnabled((prev) => !prev)}
+            onToggleWebSearch={handleToggleWebSearch}
             t={t}
             theme={theme}
           />
@@ -319,7 +347,7 @@ const App = () => {
             isTyping={isTyping}
             selectedModel={currentModel}
             webSearchEnabled={webSearchEnabled}
-            onToggleWebSearch={() => setWebSearchEnabled((prev) => !prev)}
+            onToggleWebSearch={handleToggleWebSearch}
             onBack={goToHome}
             onFollowUp={handleFollowUp}
             t={t}
@@ -332,6 +360,8 @@ const App = () => {
             history={history}
             onLoadChat={loadChat}
             onDelete={handleDeleteHistoryItem}
+            onDeleteAll={handleDeleteAllHistory}
+            onStartNew={handleStartNewFromLibrary}
             onBack={goToHome}
             t={t}
             theme={theme}
@@ -397,6 +427,8 @@ const App = () => {
           close={() => setShowSettings(false)}
           apiKey={apiKey}
           setApiKey={setApiKey}
+          systemPrompt={systemPrompt}
+          setSystemPrompt={setSystemPrompt}
           models={customModels}
           addModel={handleAddModel}
           deleteModel={handleDeleteModel}
@@ -407,6 +439,67 @@ const App = () => {
           setLanguage={setLanguage}
           t={t}
         />
+      )}
+
+      {showWebSearchInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div
+            className={`w-full max-w-2xl rounded-2xl shadow-2xl border p-6 space-y-4 ${
+              theme === 'dark'
+                ? 'bg-[#1f1f1f] border-[#2d2d2d] text-white'
+                : 'bg-white border-gray-200 text-gray-900'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold">{t('webSearchInfoTitle')}</h3>
+                <div className="mt-3 space-y-3 text-sm leading-6">
+                  {t('webSearchInfoBody')
+                    .split('\n\n')
+                    .map((paragraph, idx) => (
+                      <p key={idx} className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                        {paragraph.includes('https://github.com/Lautaro005/PerplexRouter') ? (
+                          <>
+                            {paragraph.split('https://github.com/Lautaro005/PerplexRouter')[0]}
+                            <a
+                              className="text-[#2dd4bf] underline break-all"
+                              href="https://github.com/Lautaro005/PerplexRouter"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              https://github.com/Lautaro005/PerplexRouter
+                            </a>
+                            {paragraph.split('https://github.com/Lautaro005/PerplexRouter')[1]}
+                          </>
+                        ) : (
+                          paragraph
+                        )}
+                      </p>
+                    ))}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWebSearchInfo(false)}
+                className={`p-2 rounded-full ${
+                  theme === 'dark'
+                    ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'text-gray-500 hover:text-black hover:bg-gray-100'
+                }`}
+                aria-label={t('cancel')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowWebSearchInfo(false)}
+                className="px-4 py-2 rounded-lg bg-[#2dd4bf] text-black font-medium hover:bg-[#25b5a3] transition-colors text-sm"
+              >
+                {t('webSearchInfoOk')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
