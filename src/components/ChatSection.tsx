@@ -5,12 +5,14 @@ import remarkBreaks from 'remark-breaks';
 import {
   AlertTriangle,
   ArrowRight,
+  Clipboard,
   CornerDownLeft,
   Cpu,
   ExternalLink,
   Globe2,
   Mic,
   MicOff,
+  RefreshCcw,
   Zap
 } from 'lucide-react';
 import type { Language, Message, ModelOption, Theme } from '../types/chat';
@@ -24,6 +26,7 @@ interface ChatSectionProps {
   setSelectedModel: (model: ModelOption) => void;
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
+  onRegenerateLast: (assistantIndex: number) => void;
   onBack: () => void;
   onFollowUp: (text: string) => void;
   t: Translator;
@@ -39,6 +42,7 @@ const ChatSection = ({
   setSelectedModel,
   webSearchEnabled,
   onToggleWebSearch,
+  onRegenerateLast,
   onBack,
   onFollowUp,
   t,
@@ -49,6 +53,7 @@ const ChatSection = ({
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isModelMenuOpen, setModelMenuOpen] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const recognitionRef = useRef<any>(null);
   const followUpRef = useRef<HTMLTextAreaElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -158,6 +163,17 @@ const ChatSection = ({
     adjustFollowUpHeight();
   }, [followUpText]);
 
+  const copyContent = async (content: string, idx: number) => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(idx);
+      setTimeout(() => setCopiedIndex(null), 1200);
+    } catch {
+      setCopiedIndex(null);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto px-4 w-full animate-fade-in relative">
       <div
@@ -173,9 +189,11 @@ const ChatSection = ({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-32 space-y-8" ref={chatContainerRef}>
-        {messages.map((msg, idx) =>
-          msg.role === 'sources' ? (
+      <div className="flex-1 overflow-y-auto pb-56 md:pb-64 space-y-8" ref={chatContainerRef}>
+        {messages.map((msg, idx) => {
+          const isLastAssistant = idx === messages.length - 1;
+
+          return msg.role === 'sources' ? (
             <div key={`sources-${idx}`} className="animate-slide-up space-y-3">
               <div className="flex items-center gap-2 text-[#2dd4bf] text-xs font-bold uppercase tracking-wider">
                 <Zap size={16} /> {t('sources')}
@@ -261,9 +279,36 @@ const ChatSection = ({
                   </ReactMarkdown>
                 </div>
               )}
+              {msg.role === 'assistant' && (
+                <div className="flex justify-end gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => copyContent(msg.content, idx)}
+                    className={`p-2 rounded-full transition-colors ${
+                      copiedIndex === idx
+                        ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]'
+                        : iconButtonBase
+                    }`}
+                    title={copiedIndex === idx ? t('copied') : t('copyAnswer')}
+                  >
+                    <Clipboard size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!isLastAssistant || isTyping}
+                    onClick={() => onRegenerateLast(idx)}
+                    className={`p-2 rounded-full transition-colors ${
+                      !isLastAssistant || isTyping ? 'text-gray-500/50 cursor-not-allowed' : iconButtonBase
+                    }`}
+                    title={t('regenerateAnswer')}
+                  >
+                    <RefreshCcw size={16} />
+                  </button>
+                </div>
+              )}
             </div>
-          )
-        )}
+          );
+        })}
 
         {isTyping && (
           <div className="space-y-4">
@@ -283,6 +328,7 @@ const ChatSection = ({
             />
           </div>
         )}
+        <div className="h-24" />
       </div>
 
       <div

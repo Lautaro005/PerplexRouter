@@ -57,6 +57,13 @@ const LibrarySection = ({
     setSearchQuery('');
   };
 
+  const cleanPreview = (text: string) =>
+    text
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[*_`#>~\-]+/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
   const closeSearch = () => {
     setShowSearch(false);
     setSearchQuery('');
@@ -133,16 +140,16 @@ const LibrarySection = ({
                 >
                   {item.title}
                 </h3>
-                <span className="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1">
+              </div>
+              <p className={`text-sm line-clamp-2 ${subTextColor}`}>{cleanPreview(item.preview)}</p>
+
+              <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
                   <Clock size={12} /> {item.date}
                 </span>
-              </div>
-              <p className={`text-sm line-clamp-2 ${subTextColor}`}>{item.preview}</p>
-
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => onDelete(item.id, e)}
-                  className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
+                  className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                   title="Eliminar"
                 >
                   <Trash2 size={16} />
@@ -209,11 +216,11 @@ const LibrarySection = ({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className={`font-semibold text-base mb-1 ${textColor}`}>{item.title}</div>
-                        <p className={`text-sm line-clamp-2 ${subTextColor}`}>{item.preview}</p>
+                        <p className={`text-sm line-clamp-2 ${subTextColor}`}>{cleanPreview(item.preview)}</p>
                       </div>
-                      <span className="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1">
-                        <Clock size={12} /> {item.date}
-                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                      <Clock size={12} /> {item.date}
                     </div>
                   </button>
                 ))

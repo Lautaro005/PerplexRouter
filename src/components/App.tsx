@@ -256,6 +256,59 @@ const App = () => {
     }
   };
 
+  const handleRegenerateLast = async (assistantIndex: number) => {
+    if (!activeChatId) return;
+    const isLast = assistantIndex === currentMessages.length - 1;
+    const target = currentMessages[assistantIndex];
+    if (!isLast || !target || target.role !== 'assistant') return;
+
+    const baseMessages = currentMessages.slice(0, assistantIndex);
+    const lastUser = [...baseMessages].reverse().find((m) => m.role === 'user');
+    if (!lastUser) return;
+
+    setIsTyping(true);
+    let visibleMessages = [...baseMessages];
+    let searchResults: SearchResult[] | undefined;
+
+    setCurrentMessages(visibleMessages);
+    updateHistoryMessages(activeChatId, visibleMessages);
+
+    if (webSearchEnabled && lastUser.content) {
+      try {
+        searchResults = await fetchSearchResults(lastUser.content);
+        if (searchResults.length) {
+          const sourcesMsg: Message = { role: 'sources', content: t('sources'), sources: searchResults };
+          visibleMessages = [...visibleMessages, sourcesMsg];
+          setCurrentMessages(visibleMessages);
+          updateHistoryMessages(activeChatId, visibleMessages);
+        }
+      } catch {
+        const searchError: Message = { role: 'error', content: t('webSearchError') };
+        visibleMessages = [...visibleMessages, searchError];
+        setCurrentMessages(visibleMessages);
+        updateHistoryMessages(activeChatId, visibleMessages);
+      }
+    }
+
+    try {
+      const reply = await callOpenRouter(visibleMessages, currentModel.id, apiKey, systemPrompt, searchResults);
+      const updatedMessages = [...visibleMessages, { role: 'assistant', content: reply } as Message];
+      setCurrentMessages(updatedMessages);
+      updateHistoryMessages(activeChatId, updatedMessages);
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error && error.message === 'NO_API_KEY'
+          ? t('errorNoKey')
+          : `${t('errorApi')} (${error instanceof Error ? error.message : 'Unknown error'})`;
+      const errorMsgObj: Message = { role: 'error', content: errorMsg };
+      const finalMessages = [...visibleMessages, errorMsgObj];
+      setCurrentMessages(finalMessages);
+      updateHistoryMessages(activeChatId, finalMessages);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
   const loadChat = (chatItem: ChatHistoryItem) => {
     setActiveChatId(chatItem.id);
     const messages = chatItem.messages?.length
@@ -350,6 +403,7 @@ const App = () => {
             setSelectedModel={setSelectedModel}
             webSearchEnabled={webSearchEnabled}
             onToggleWebSearch={handleToggleWebSearch}
+            onRegenerateLast={handleRegenerateLast}
             onBack={goToHome}
             onFollowUp={handleFollowUp}
             t={t}
