@@ -346,12 +346,15 @@ const App = () => {
             messages={currentMessages}
             isTyping={isTyping}
             selectedModel={currentModel}
+            models={customModels}
+            setSelectedModel={setSelectedModel}
             webSearchEnabled={webSearchEnabled}
             onToggleWebSearch={handleToggleWebSearch}
             onBack={goToHome}
             onFollowUp={handleFollowUp}
             t={t}
             theme={theme}
+            language={language}
           />
         );
       case 'library':

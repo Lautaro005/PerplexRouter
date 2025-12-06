@@ -2,34 +2,55 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { AlertTriangle, ArrowRight, CornerDownLeft, Cpu, ExternalLink, Globe2, Zap } from 'lucide-react';
-import type { Message, ModelOption, Theme } from '../types/chat';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CornerDownLeft,
+  Cpu,
+  ExternalLink,
+  Globe2,
+  Mic,
+  MicOff,
+  Zap
+} from 'lucide-react';
+import type { Language, Message, ModelOption, Theme } from '../types/chat';
 import type { Translator } from '../constants/translations';
 
 interface ChatSectionProps {
   messages: Message[];
   isTyping: boolean;
   selectedModel: ModelOption;
+  models: ModelOption[];
+  setSelectedModel: (model: ModelOption) => void;
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
   onBack: () => void;
   onFollowUp: (text: string) => void;
   t: Translator;
   theme: Theme;
+  language: Language;
 }
 
 const ChatSection = ({
   messages,
   isTyping,
   selectedModel,
+  models,
+  setSelectedModel,
   webSearchEnabled,
   onToggleWebSearch,
   onBack,
   onFollowUp,
   t,
-  theme
+  theme,
+  language
 }: ChatSectionProps) => {
   const [followUpText, setFollowUpText] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [isModelMenuOpen, setModelMenuOpen] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const followUpRef = useRef<HTMLTextAreaElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
 
   const hostnameFromLink = (link: string) => {
@@ -46,51 +67,110 @@ const ChatSection = ({
     }
   }, [messages, isTyping]);
 
-  const handleSubmitFollowUp = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  useEffect(() => {
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+      recognitionRef.current = null;
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = language === 'es' ? 'es-ES' : 'en-US';
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join(' ');
+      setFollowUpText((prev) => `${prev} ${transcript}`.trim());
+    };
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    setSpeechSupported(true);
+
+    return () => {
+      recognition.stop();
+      recognitionRef.current = null;
+      setIsListening(false);
+    };
+  }, [language]);
+
+  const toggleDictation = () => {
+    if (!speechSupported || !recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    recognitionRef.current.lang = language === 'es' ? 'es-ES' : 'en-US';
+    try {
+      recognitionRef.current.start();
+    } catch {
+      recognitionRef.current.stop();
+      recognitionRef.current.start();
+    }
+  };
+
+  const submitFollowUp = () => {
+    if (!followUpText.trim() || isTyping) return;
     onFollowUp(followUpText);
     setFollowUpText('');
+    if (followUpRef.current) {
+      followUpRef.current.style.height = 'auto';
+      followUpRef.current.style.overflowY = 'hidden';
+    }
+  };
+
+  const handleSubmitFollowUp = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    submitFollowUp();
+  };
+
+  const adjustFollowUpHeight = () => {
+    const el = followUpRef.current;
+    if (!el) return;
+    const maxHeight = 8 * 24; // roughly 8 lines
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
   };
 
   const textColor = theme === 'dark' ? 'text-[#e8e8e6]' : 'text-gray-900';
   const mutedTextColor = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
   const inputBg = theme === 'dark' ? 'bg-[#202020] border-[#333]' : 'bg-white border-gray-200 shadow-sm';
+  const iconButtonBase =
+    theme === 'dark'
+      ? 'text-gray-400 hover:text-white hover:bg-white/5'
+      : 'text-gray-600 hover:text-black hover:bg-black/5';
+  const dropdownBg = theme === 'dark' ? 'bg-[#1a1a1a] border-[#333]' : 'bg-white border-gray-200';
+  const dropdownItemHover = theme === 'dark' ? 'hover:bg-[#2d2d2d]' : 'hover:bg-gray-100';
+
+  useEffect(() => {
+    adjustFollowUpHeight();
+  }, [followUpText]);
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto px-4 w-full animate-fade-in relative">
       <div
-      className={`sticky top-0 z-10 py-4 backdrop-blur-md flex justify-between items-center ${
-        theme === 'dark' ? 'bg-[#191919]/80' : 'bg-[#f0f0f0]/80'
-      }`}
-    >
-      <button
-        onClick={onBack}
-        className="text-sm text-gray-500 hover:text-[#2dd4bf] flex items-center gap-2"
+        className={`sticky top-0 z-10 py-4 backdrop-blur-md flex justify-start items-center ${
+          theme === 'dark' ? 'bg-[#191919]/80' : 'bg-[#f0f0f0]/80'
+        }`}
       >
-        <CornerDownLeft size={14} /> {t('backToHome')}
-      </button>
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 text-xs bg-[#2dd4bf]/10 text-[#2dd4bf] px-2 py-1 rounded">
-          <Cpu size={12} /> {selectedModel.name}
-        </div>
         <button
-          type="button"
-          onClick={onToggleWebSearch}
-          className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
-            webSearchEnabled
-              ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]'
-              : theme === 'dark'
-                ? 'bg-white/5 text-gray-400 hover:text-white'
-                : 'bg-black/5 text-gray-600 hover:text-black'
-          }`}
-          title={webSearchEnabled ? t('webSearchOn') : t('webSearchOff')}
+          onClick={onBack}
+          className="text-sm text-gray-500 hover:text-[#2dd4bf] flex items-center gap-2"
         >
-          <Globe2 size={12} />
-          <span className="hidden sm:inline">
-            {webSearchEnabled ? t('webSearchOn') : t('webSearchOff')}
-          </span>
+          <CornerDownLeft size={14} /> {t('backToHome')}
         </button>
-      </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-32 space-y-8" ref={chatContainerRef}>
@@ -215,37 +295,108 @@ const ChatSection = ({
         <div className="max-w-3xl mx-auto">
           <form
             onSubmit={handleSubmitFollowUp}
-            className={`flex items-center gap-2 p-2 rounded-full border ${inputBg}`}
+            className={`flex flex-col gap-3 p-3 rounded-2xl border ${inputBg}`}
           >
-            <button
-              type="button"
-              onClick={onToggleWebSearch}
-              className={`p-2 rounded-full transition-colors ${
-                webSearchEnabled
-                  ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]'
-                  : theme === 'dark'
-                    ? 'text-gray-400 hover:text-white'
-                    : 'text-gray-600 hover:text-black'
-              }`}
-              title={webSearchEnabled ? t('webSearchOn') : t('webSearchOff')}
-            >
-              <Globe2 size={18} />
-            </button>
-            <input
+            <textarea
+              ref={followUpRef}
               value={followUpText}
               onChange={(e) => setFollowUpText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  submitFollowUp();
+                }
+              }}
               placeholder={t('followUp')}
-              className={`flex-1 bg-transparent px-4 py-2 outline-none ${textColor} placeholder-gray-500`}
+              className={`w-full bg-transparent px-4 py-2 outline-none resize-none min-h-[60px] max-h-[320px] overflow-y-auto leading-relaxed ${textColor} placeholder-gray-500`}
+              rows={1}
             />
-            <button
-              type="submit"
-              disabled={!followUpText.trim() || isTyping}
-              className={`p-2 rounded-full transition-all ${
-                followUpText.trim() ? 'bg-[#2dd4bf] text-black' : 'bg-gray-500/20 text-gray-500'
-              }`}
-            >
-              <ArrowRight size={18} />
-            </button>
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setModelMenuOpen((prev) => !prev)}
+                    className={`p-2 rounded-full transition-colors ${
+                      isModelMenuOpen ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]' : iconButtonBase
+                    }`}
+                    title={`${t('aiModel')}: ${selectedModel.name}`}
+                  >
+                    <Cpu size={18} />
+                  </button>
+
+                  {isModelMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setModelMenuOpen(false)} />
+                      <div
+                        className={`absolute bottom-full left-0 mb-2 w-56 border rounded-lg shadow-xl z-20 py-1 overflow-hidden ${dropdownBg}`}
+                      >
+                        <div className="px-3 py-2 text-xs font-bold text-gray-500 border-b border-gray-500/20">
+                          {t('availableModels')}
+                        </div>
+                        {models.map((model) => (
+                          <button
+                            key={model.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedModel(model);
+                              setModelMenuOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors ${dropdownItemHover} ${
+                              selectedModel.id === model.id
+                                ? 'text-[#2dd4bf]'
+                                : theme === 'dark'
+                                  ? 'text-gray-300'
+                                  : 'text-gray-800'
+                            }`}
+                          >
+                            <span className="truncate">{model.name}</span>
+                            {selectedModel.id === model.id && <Zap size={12} />}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={onToggleWebSearch}
+                  className={`p-2 rounded-full transition-colors ${
+                    webSearchEnabled ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]' : iconButtonBase
+                  }`}
+                  title={webSearchEnabled ? t('webSearchOn') : t('webSearchOff')}
+              >
+                <Globe2 size={18} />
+              </button>
+            </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={toggleDictation}
+                  disabled={!speechSupported}
+                  className={`p-2 rounded-full transition-colors ${
+                    !speechSupported
+                      ? 'text-gray-500/50 cursor-not-allowed'
+                      : isListening
+                        ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]'
+                        : iconButtonBase
+                  }`}
+                  title={speechSupported ? t('dictation') : t('dictationUnavailable')}
+                >
+                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                </button>
+                <button
+                  type="submit"
+                  disabled={!followUpText.trim() || isTyping}
+                  className={`p-2 rounded-full transition-all ${
+                    followUpText.trim() ? 'bg-[#2dd4bf] text-black' : 'bg-gray-500/20 text-gray-500'
+                  }`}
+                  title={t('followUp')}
+                >
+                  <ArrowRight size={18} />
+                </button>
+              </div>
+            </div>
           </form>
         </div>
       </div>

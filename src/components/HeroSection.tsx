@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ChevronDown, Cpu, Globe2, Zap } from 'lucide-react';
 import type { ModelOption, Theme } from '../types/chat';
 import type { Translator } from '../constants/translations';
@@ -26,11 +26,25 @@ const HeroSection = ({
 }: HeroSectionProps) => {
   const [query, setQuery] = useState('');
   const [isDropdownOpen, setDropdownOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     onSearch(query);
   };
+
+  const adjustHeight = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const maxHeight = 8 * 24; // limit to roughly 8 lines
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  };
+
+  useEffect(() => {
+    adjustHeight();
+  }, [query]);
 
   const textColor = theme === 'dark' ? 'text-[#e8e8e6]' : 'text-gray-900';
   const textAreaBg =
@@ -53,6 +67,7 @@ const HeroSection = ({
           className={`relative z-10 border rounded-xl shadow-2xl transition-all duration-300 focus-within:ring-2 focus-within:ring-[#2dd4bf]/20 ${textAreaBg}`}
         >
           <textarea
+            ref={textareaRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -62,7 +77,7 @@ const HeroSection = ({
               }
             }}
             placeholder={t('askAnything')}
-            className={`w-full bg-transparent placeholder-gray-500 text-lg p-5 pr-14 outline-none resize-none min-h-[60px] max-h-[200px] ${textColor}`}
+            className={`w-full bg-transparent placeholder-gray-500 text-lg p-5 pr-14 outline-none resize-none min-h-[60px] max-h-[320px] overflow-y-auto leading-relaxed ${textColor}`}
             rows={1}
           />
 
