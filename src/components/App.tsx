@@ -17,7 +17,7 @@ import type {
   Theme,
   ViewState
 } from '../types/chat';
-import { Menu, X } from 'lucide-react';
+import { PanelLeftOpen, Menu, X } from 'lucide-react';
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -396,6 +396,19 @@ const App = () => {
         t={t}
       />
 
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className={`fixed top-4 left-4 z-40 p-3 rounded-full shadow-lg border transition-colors ${
+            theme === 'dark'
+              ? 'bg-[#191919] border-[#2d2d2d] text-gray-200 hover:text-white hover:border-[#2dd4bf]/50'
+              : 'bg-white border-gray-200 text-gray-700 hover:text-black hover:border-[#2dd4bf]/50'
+          }`}
+          aria-label="Open sidebar"
+        >
+          <PanelLeftOpen size={20} />
+        </button>
+      )}
       <main
         className={`flex-1 flex flex-col relative transition-all duration-300 ${
           isSidebarOpen ? 'ml-0 md:ml-0' : 'ml-0'

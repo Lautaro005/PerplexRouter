@@ -1,4 +1,4 @@
-import { Library, Plus, Search, Settings, X } from 'lucide-react';
+import { PanelLeftOpen, PanelRightOpen, Library, Plus, Search, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { ChatHistoryItem, Theme, ViewState } from '../types/chat';
 import type { Translator } from '../constants/translations';
@@ -64,7 +64,7 @@ const Sidebar = ({
       className={`fixed inset-y-0 left-0 z-30 w-64 border-r transform transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0
         ${theme === 'dark' ? 'bg-[#191919] border-[#2d2d2d]' : 'bg-[#f7f7f7] border-gray-200'}
-        ${isOpen ? 'translate-x-0' : '-translate-x-full md:w-0 md:border-none md:overflow-hidden'}`}
+        ${isOpen ? 'translate-x-0' : '-translate-x-full md:-translate-x-full md:w-0 md:border-none md:overflow-hidden md:opacity-0 md:pointer-events-none'}`}
     >
       <div
         className={`flex flex-col h-full p-4 ${
@@ -84,8 +84,14 @@ const Sidebar = ({
               PerplexRouter
             </span>
           </div>
-          <button onClick={toggle} className="md:hidden text-gray-400">
-            <X size={20} />
+          <button
+            onClick={toggle}
+            className={`text-gray-400 hover:text-white/90 hover:bg-white/5 rounded-full p-1 ${
+              theme === 'light' ? 'hover:text-gray-700 hover:bg-black/5' : ''
+            }`}
+            title={isOpen ? 'Cerrar' : 'Abrir'}
+          >
+            {isOpen ? <PanelRightOpen size={20} /> : <PanelLeftOpen size={20} />}
           </button>
         </div>
 
