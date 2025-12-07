@@ -23,8 +23,17 @@ export interface ChatHistoryItem {
   date: string;
   preview: string;
   messages: Message[];
+  projectId?: number;
 }
 
-export type ViewState = 'home' | 'chat' | 'library';
+export interface Project {
+  id: number;
+  title: string;
+  icon: string;
+  aiPrompt: string;
+  chats: ChatHistoryItem[];
+}
+
+export type ViewState = 'home' | 'chat' | 'library' | 'projects' | 'projectDetail';
 export type Theme = 'dark' | 'light';
 export type Language = 'es' | 'en';

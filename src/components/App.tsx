@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import ChatSection from './ChatSection';
 import HeroSection from './HeroSection';
 import LibrarySection from './LibrarySection';
+import ProjectsSection from './ProjectsSection';
+import ProjectDetail from './ProjectDetail';
 import SettingsModal from './SettingsModal';
+import ProjectModal from './ProjectModal';
 import Sidebar from './Sidebar';
 import { DEFAULT_MODELS } from '../constants/models';
 import { createTranslator } from '../constants/translations';
@@ -13,6 +16,7 @@ import type {
   Language,
   Message,
   ModelOption,
+  Project,
   SearchResult,
   Theme,
   ViewState
@@ -33,10 +37,14 @@ const App = () => {
   const [apiKey, setApiKey] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [history, setHistory] = useState<ChatHistoryItem[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
   const [customModels, setCustomModels] = useState<ModelOption[]>(DEFAULT_MODELS);
   const [selectedModel, setSelectedModel] = useState<ModelOption>(DEFAULT_MODELS[0]);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [showWebSearchInfo, setShowWebSearchInfo] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const [theme, setTheme] = useState<Theme>('dark');
   const [language, setLanguage] = useState<Language>('es');
@@ -47,6 +55,7 @@ const App = () => {
     if (!isBrowser) return;
     const storedKey = localStorage.getItem('openrouter_key');
     const storedHistory = localStorage.getItem('chat_history');
+    const storedProjects = localStorage.getItem('projects');
     const storedModels = localStorage.getItem('custom_models');
     const storedWebSearch = localStorage.getItem('web_search_enabled');
     const storedSystemPrompt = localStorage.getItem('system_prompt');
@@ -58,6 +67,13 @@ const App = () => {
         setHistory(JSON.parse(storedHistory));
       } catch {
         setHistory([]);
+      }
+    }
+    if (storedProjects) {
+      try {
+        setProjects(JSON.parse(storedProjects));
+      } catch {
+        setProjects([]);
       }
     }
     if (storedModels) {
@@ -94,6 +110,11 @@ const App = () => {
 
   useEffect(() => {
     if (!isBrowser) return;
+    localStorage.setItem('projects', JSON.stringify(projects));
+  }, [projects]);
+
+  useEffect(() => {
+    if (!isBrowser) return;
     localStorage.setItem('custom_models', JSON.stringify(customModels));
   }, [customModels]);
 
@@ -126,11 +147,32 @@ const App = () => {
       minute: '2-digit'
     });
 
-  const updateHistoryMessages = (chatId: number, messages: Message[]) => {
-    setHistory((prev) => prev.map((h) => (h.id === chatId ? { ...h, messages } : h)));
+  const syncProjectChat = (chat: ChatHistoryItem) => {
+    setProjects((prev) =>
+      prev.map((p) => {
+        const withoutChat = p.chats.filter((c) => c.id !== chat.id);
+        if (chat.projectId === p.id) {
+          return { ...p, chats: [chat, ...withoutChat] };
+        }
+        return { ...p, chats: withoutChat };
+      })
+    );
   };
 
-  const handleInitialSearch = async (query: string) => {
+  const updateHistoryMessages = (chatId: number, messages: Message[]) => {
+    setHistory((prev) =>
+      prev.map((h) => {
+        if (h.id === chatId) {
+          const updated = { ...h, messages };
+          syncProjectChat(updated);
+          return updated;
+        }
+        return h;
+      })
+    );
+  };
+
+  const handleInitialSearch = async (query: string, projectId?: number) => {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) return;
 
@@ -148,9 +190,13 @@ const App = () => {
       title: trimmedQuery,
       date: formatDate(),
       preview: '...',
-      messages: visibleMessages
+      messages: visibleMessages,
+      projectId
     };
     setHistory((prev) => [newEntry, ...prev]);
+    if (projectId) {
+      syncProjectChat(newEntry);
+    }
 
     let searchResults: SearchResult[] | undefined;
 
@@ -177,13 +223,17 @@ const App = () => {
       const updatedMessages = [...visibleMessages, assistantMsg];
 
       setCurrentMessages(updatedMessages);
+      let updatedChat: ChatHistoryItem | null = null;
       setHistory((prev) =>
-        prev.map((h) =>
-          h.id === newChatId
-            ? { ...h, preview: `${reply.substring(0, 100)}...`, messages: updatedMessages }
-            : h
-        )
+        prev.map((h) => {
+          if (h.id === newChatId) {
+            updatedChat = { ...h, preview: `${reply.substring(0, 100)}...`, messages: updatedMessages };
+            return updatedChat;
+          }
+          return h;
+        })
       );
+      if (updatedChat) syncProjectChat(updatedChat);
     } catch (error) {
       const errorMsg =
         error instanceof Error && error.message === 'NO_API_KEY'
@@ -234,13 +284,17 @@ const App = () => {
       const finalMessages = [...visibleMessages, { role: 'assistant', content: reply } as Message];
 
       setCurrentMessages(finalMessages);
+      let updatedChat: ChatHistoryItem | null = null;
       setHistory((prev) =>
-        prev.map((h) =>
-          h.id === activeChatId
-            ? { ...h, messages: finalMessages, preview: `${reply.substring(0, 100)}...` }
-            : h
-        )
+        prev.map((h) => {
+          if (h.id === activeChatId) {
+            updatedChat = { ...h, messages: finalMessages, preview: `${reply.substring(0, 100)}...` };
+            return updatedChat;
+          }
+          return h;
+        })
       );
+      if (updatedChat) syncProjectChat(updatedChat);
     } catch (error) {
       const errorMsg =
         error instanceof Error && error.message === 'NO_API_KEY'
@@ -325,6 +379,9 @@ const App = () => {
   const handleDeleteHistoryItem = (id: number, e?: MouseEvent<HTMLButtonElement>) => {
     if (e) e.stopPropagation();
     setHistory((prev) => prev.filter((item) => item.id !== id));
+    setProjects((prev) =>
+      prev.map((p) => ({ ...p, chats: p.chats.filter((c) => c.id !== id) }))
+    );
     if (activeChatId === id) {
       goToHome();
     }
@@ -332,9 +389,16 @@ const App = () => {
 
   const handleDeleteAllHistory = () => {
     setHistory([]);
+    setProjects((prev) => prev.map((p) => ({ ...p, chats: [] })));
     setActiveChatId(null);
     setCurrentMessages([]);
     setViewState('library');
+  };
+
+  const handleDeleteIndependentHistory = () => {
+    setHistory((prev) => prev.filter((item) => item.projectId));
+    setActiveChatId(null);
+    setCurrentMessages([]);
   };
 
   const handleStartNewFromLibrary = () => {
@@ -366,8 +430,83 @@ const App = () => {
 
   const goToHome = () => {
     setViewState('home');
+    setActiveProjectId(null);
     setCurrentMessages([]);
     setActiveChatId(null);
+  };
+
+  const goToProjects = () => {
+    setViewState('projects');
+    setActiveProjectId(null);
+  };
+
+  const openProjectDetail = (id: number) => {
+    setActiveProjectId(id);
+    setViewState('projectDetail');
+  };
+
+  const handleCreateOrUpdateProject = (data: { title: string; icon: string; aiPrompt: string }) => {
+    if (editingProject) {
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === editingProject.id
+            ? { ...p, title: data.title || 'Proyecto', icon: data.icon || '📁', aiPrompt: data.aiPrompt }
+            : p
+        )
+      );
+      setEditingProject(null);
+    } else {
+      const newProject: Project = {
+        id: Date.now(),
+        title: data.title || 'Proyecto',
+        icon: data.icon || '📁',
+        aiPrompt: data.aiPrompt || '',
+        chats: []
+      };
+      setProjects((prev) => [newProject, ...prev]);
+    }
+    setShowProjectModal(false);
+  };
+
+  const handleDeleteProject = (projectId: number) => {
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    if (activeProjectId === projectId) {
+      goToProjects();
+    }
+  };
+
+  const assignChatToProject = (chatId: number, projectId: number | null) => {
+    setHistory((prev) => {
+      let targetChat: ChatHistoryItem | null = null;
+      const updatedHistory = prev.map((chat) => {
+        if (chat.id === chatId) {
+          targetChat = { ...chat, projectId: projectId || undefined };
+          return targetChat;
+        }
+        return chat;
+      });
+
+      if (targetChat) {
+        setProjects((prevProjects) =>
+          prevProjects.map((p) => {
+            const withoutChat = p.chats.filter((c) => c.id !== chatId);
+            if (projectId && p.id === projectId) {
+              return { ...p, chats: [targetChat!, ...withoutChat] };
+            }
+            return { ...p, chats: withoutChat };
+          })
+        );
+      }
+      return updatedHistory;
+    });
+  };
+
+  const handleAddChatToProject = (projectId: number, text: string) => {
+    handleInitialSearch(text, projectId);
+  };
+
+  const handleDeleteChatEverywhere = (chatId: number) => {
+    handleDeleteHistoryItem(chatId);
   };
 
   const handleToggleWebSearch = () => {
@@ -391,6 +530,7 @@ const App = () => {
             onToggleWebSearch={handleToggleWebSearch}
             t={t}
             theme={theme}
+            language={language}
           />
         );
       case 'chat':
@@ -401,6 +541,10 @@ const App = () => {
             selectedModel={currentModel}
             models={customModels}
             setSelectedModel={setSelectedModel}
+            activeChatId={activeChatId}
+            activeChatProjectId={history.find((h) => h.id === activeChatId)?.projectId}
+            projects={projects}
+            onAssignToProject={assignChatToProject}
             webSearchEnabled={webSearchEnabled}
             onToggleWebSearch={handleToggleWebSearch}
             onRegenerateLast={handleRegenerateLast}
@@ -411,6 +555,48 @@ const App = () => {
             language={language}
           />
         );
+      case 'projects':
+        return (
+          <ProjectsSection
+            projects={projects}
+            theme={theme}
+            t={t}
+            onAdd={() => {
+              setEditingProject(null);
+              setShowProjectModal(true);
+            }}
+            onOpen={openProjectDetail}
+          />
+        );
+      case 'projectDetail': {
+        const activeProject = projects.find((p) => p.id === activeProjectId);
+        if (!activeProject) {
+          goToProjects();
+          return null;
+        }
+        return (
+          <ProjectDetail
+            project={activeProject}
+            theme={theme}
+            t={t}
+            models={customModels}
+            selectedModel={currentModel}
+            setSelectedModel={setSelectedModel}
+            webSearchEnabled={webSearchEnabled}
+            onToggleWebSearch={handleToggleWebSearch}
+            language={language}
+            onBack={goToProjects}
+            onEdit={(project) => {
+              setEditingProject(project);
+              setShowProjectModal(true);
+            }}
+            onDelete={handleDeleteProject}
+            onAddChat={handleAddChatToProject}
+            onDeleteChat={handleDeleteChatEverywhere}
+            onOpenChat={loadChat}
+          />
+        );
+      }
       case 'library':
         return (
           <LibrarySection
@@ -418,8 +604,11 @@ const App = () => {
             onLoadChat={loadChat}
             onDelete={handleDeleteHistoryItem}
             onDeleteAll={handleDeleteAllHistory}
+            onDeleteIndependent={handleDeleteIndependentHistory}
             onStartNew={handleStartNewFromLibrary}
             onBack={goToHome}
+            onAssign={assignChatToProject}
+            projects={projects}
             t={t}
             theme={theme}
           />
@@ -443,6 +632,7 @@ const App = () => {
         history={history}
         openSettings={() => setShowSettings(true)}
         onLibraryClick={() => setViewState('library')}
+        onProjectsClick={goToProjects}
         onHomeClick={goToHome}
         onLoadChat={loadChat}
         currentView={viewState}
@@ -508,6 +698,19 @@ const App = () => {
           language={language}
           setLanguage={setLanguage}
           t={t}
+        />
+      )}
+
+      {showProjectModal && (
+        <ProjectModal
+          theme={theme}
+          t={t}
+          onClose={() => {
+            setShowProjectModal(false);
+            setEditingProject(null);
+          }}
+          onSubmit={handleCreateOrUpdateProject}
+          initial={editingProject}
         />
       )}
 

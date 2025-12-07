@@ -10,12 +10,13 @@ import {
   Cpu,
   ExternalLink,
   Globe2,
+  FolderOpen,
   Mic,
   MicOff,
   RefreshCcw,
   Zap
 } from 'lucide-react';
-import type { Language, Message, ModelOption, Theme } from '../types/chat';
+import type { Language, Message, ModelOption, Theme, Project } from '../types/chat';
 import type { Translator } from '../constants/translations';
 
 interface ChatSectionProps {
@@ -24,6 +25,10 @@ interface ChatSectionProps {
   selectedModel: ModelOption;
   models: ModelOption[];
   setSelectedModel: (model: ModelOption) => void;
+  activeChatId?: number | null;
+  activeChatProjectId?: number | undefined;
+  projects: Project[];
+  onAssignToProject: (chatId: number, projectId: number) => void;
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
   onRegenerateLast: (assistantIndex: number) => void;
@@ -40,6 +45,10 @@ const ChatSection = ({
   selectedModel,
   models,
   setSelectedModel,
+  activeChatId,
+  activeChatProjectId,
+  projects,
+  onAssignToProject,
   webSearchEnabled,
   onToggleWebSearch,
   onRegenerateLast,
@@ -54,6 +63,7 @@ const ChatSection = ({
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isModelMenuOpen, setModelMenuOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [assignMenuOpen, setAssignMenuOpen] = useState(false);
   const recognitionRef = useRef<any>(null);
   const followUpRef = useRef<HTMLTextAreaElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -179,7 +189,7 @@ const ChatSection = ({
   return (
     <div className={`flex flex-col h-full w-full ${contentWidth} animate-fade-in relative`}>
       <div
-        className={`sticky top-0 z-10 py-4 backdrop-blur-md flex justify-start items-center ${
+        className={`sticky top-0 z-10 py-4 backdrop-blur-md flex items-center justify-between ${
           theme === 'dark' ? 'bg-[#191919]/80' : 'bg-[#f0f0f0]/80'
         }`}
       >
@@ -189,6 +199,60 @@ const ChatSection = ({
         >
           <CornerDownLeft size={14} /> {t('backToHome')}
         </button>
+        {activeChatId && projects.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setAssignMenuOpen((prev) => !prev)}
+              className={`p-2 rounded-full ${
+                activeChatProjectId
+                  ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]'
+                  : theme === 'dark'
+                    ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'text-gray-600 hover:text-black hover:bg-black/5'
+              }`}
+              title={t('assignToProject')}
+            >
+              <FolderOpen size={16} aria-label={t('assignToProject')} />
+            </button>
+            {assignMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setAssignMenuOpen(false)} />
+                <div
+                  className={`absolute right-0 mt-2 z-20 w-48 rounded-lg border shadow-lg overflow-hidden ${
+                    theme === 'dark'
+                      ? 'bg-[#1f1f1f] border-[#2d2d2d] text-gray-200'
+                      : 'bg-white border-gray-200 text-gray-800'
+                  }`}
+                >
+                  {projects.map((p) => {
+                    const isActive = activeChatProjectId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          onAssignToProject(activeChatId, isActive ? (null as any) : p.id);
+                          setAssignMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
+                          isActive
+                            ? theme === 'dark'
+                              ? 'bg-[#2dd4bf]/15 text-[#2dd4bf]'
+                              : 'bg-[#0f766e]/10 text-[#0f766e]'
+                            : theme === 'dark'
+                              ? 'hover:bg-white/5'
+                              : 'hover:bg-black/5'
+                        }`}
+                      >
+                        <span className="text-lg">{p.icon}</span>
+                        <span className="truncate">{p.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div

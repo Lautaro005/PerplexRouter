@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, ChevronDown, Cpu, Globe2, Zap } from 'lucide-react';
-import type { ModelOption, Theme } from '../types/chat';
+import { ArrowRight, ChevronDown, Cpu, Globe2, Zap, Mic, MicOff } from 'lucide-react';
+import type { Language, ModelOption, Theme } from '../types/chat';
 import type { Translator } from '../constants/translations';
 
 interface HeroSectionProps {
@@ -12,6 +12,7 @@ interface HeroSectionProps {
   onToggleWebSearch: () => void;
   t: Translator;
   theme: Theme;
+  language: Language;
 }
 
 const HeroSection = ({
@@ -22,11 +23,15 @@ const HeroSection = ({
   webSearchEnabled,
   onToggleWebSearch,
   t,
-  theme
+  theme,
+  language
 }: HeroSectionProps) => {
   const [query, setQuery] = useState('');
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,6 +50,59 @@ const HeroSection = ({
   useEffect(() => {
     adjustHeight();
   }, [query]);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+      recognitionRef.current = null;
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = language === 'es' ? 'es-ES' : 'en-US';
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0].transcript)
+        .join(' ');
+      setQuery((prev) => `${prev} ${transcript}`.trim());
+    };
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    setSpeechSupported(true);
+
+    return () => {
+      recognition.stop();
+      recognitionRef.current = null;
+      setIsListening(false);
+    };
+  }, [language]);
+
+  const toggleDictation = () => {
+    if (!speechSupported || !recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    recognitionRef.current.lang = language === 'es' ? 'es-ES' : 'en-US';
+    try {
+      recognitionRef.current.start();
+    } catch {
+      recognitionRef.current.stop();
+      recognitionRef.current.start();
+    }
+  };
 
   const textColor = theme === 'dark' ? 'text-[#e8e8e6]' : 'text-gray-900';
   const textAreaBg =
@@ -83,7 +141,6 @@ const HeroSection = ({
 
           <div className="flex items-center justify-between px-4 pb-3">
             <div className="flex items-center gap-2">
-              
               <div className="relative">
                 <button
                   type="button"
@@ -150,17 +207,37 @@ const HeroSection = ({
               </button>
             </div>
 
-            <button
-              type="submit"
-              className={`p-2 rounded-full transition-all ${
-                query.trim()
-                  ? 'bg-[#2dd4bf] text-black hover:scale-105'
-                  : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
-              }`}
-              disabled={!query.trim()}
-            >
-              <ArrowRight size={18} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleDictation}
+                disabled={!speechSupported}
+                className={`p-2 rounded-full transition-colors ${
+                  !speechSupported
+                    ? 'text-gray-500/50 cursor-not-allowed'
+                    : isListening
+                      ? 'bg-[#2dd4bf]/20 text-[#2dd4bf]'
+                      : theme === 'dark'
+                        ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                        : 'text-gray-600 hover:text-black hover:bg-black/5'
+                }`}
+                title={speechSupported ? t('dictation') : t('dictationUnavailable')}
+              >
+                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+
+              <button
+                type="submit"
+                className={`p-2 rounded-full transition-all ${
+                  query.trim()
+                    ? 'bg-[#2dd4bf] text-black hover:scale-105'
+                    : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                }`}
+                disabled={!query.trim()}
+              >
+                <ArrowRight size={18} />
+              </button>
+            </div>
           </div>
         </form>
       </div>

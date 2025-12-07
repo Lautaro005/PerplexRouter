@@ -1,4 +1,4 @@
-import { PanelLeftOpen, PanelRightOpen, Library, Plus, Search, Settings } from 'lucide-react';
+import { PanelLeftOpen, PanelRightOpen, Library, Plus, Search, Settings, FolderOpen } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { ChatHistoryItem, Theme, ViewState } from '../types/chat';
 import type { Translator } from '../constants/translations';
@@ -9,6 +9,7 @@ interface SidebarProps {
   history: ChatHistoryItem[];
   openSettings: () => void;
   onLibraryClick: () => void;
+  onProjectsClick: () => void;
   onHomeClick: () => void;
   onLoadChat: (item: ChatHistoryItem) => void;
   currentView: ViewState;
@@ -51,6 +52,7 @@ const Sidebar = ({
   history,
   openSettings,
   onLibraryClick,
+  onProjectsClick,
   onHomeClick,
   onLoadChat,
   currentView,
@@ -125,6 +127,13 @@ const Sidebar = ({
             theme={theme}
           />
           <NavItem
+            icon={<FolderOpen size={18} />}
+            label={t('projects')}
+            active={currentView === 'projects' || currentView === 'projectDetail'}
+            onClick={onProjectsClick}
+            theme={theme}
+          />
+          <NavItem
             icon={<Library size={18} />}
             label={t('library')}
             active={currentView === 'library'}
@@ -177,7 +186,7 @@ const Sidebar = ({
           </button>
 
           <div className="mt-2 flex items-center justify-between px-3">
-            <span className="text-xs text-gray-500">x: <a href="https://x.com/nosoylauti/">@nosoylauti</a></span>
+            <span className="text-xs text-gray-500">x: <a href="https://x.com/nosoylauti/">@nosoylauti</a> | v. 1.3.0</span>
           </div>
         </div>
       </div>
